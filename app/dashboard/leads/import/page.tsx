@@ -161,7 +161,6 @@ export default function ImportLeadsPage() {
 
       console.log("[v0] Attempting to import", leads.length, "leads")
 
-      // Filter out leads without email addresses to avoid conflicts
       const validLeads = leads.filter((lead) => lead.email && lead.email.trim() !== "")
       const invalidLeads = leads.filter((lead) => !lead.email || lead.email.trim() === "")
 
@@ -172,28 +171,24 @@ export default function ImportLeadsPage() {
       let errorCount = 0
       const errors: string[] = []
 
-      // Process leads in smaller batches to avoid conflicts
-      const batchSize = 10
-      for (let i = 0; i < validLeads.length; i += batchSize) {
-        const batch = validLeads.slice(i, i + batchSize)
-
+      if (validLeads.length > 0) {
         try {
-          // Use upsert with email as the conflict resolution key
-          const { error: upsertError, count } = await supabase
+          // Use upsert with proper conflict resolution on email field
+          const { data, error: upsertError } = await supabase
             .from("leads")
-            .upsert(batch, {
-              onConflict: "email,user_id",
+            .upsert(validLeads, {
+              onConflict: "email",
               ignoreDuplicates: false,
             })
-            .select("id", { count: "exact" })
+            .select("id")
 
           if (upsertError) {
-            console.log("[v0] Batch upsert error:", upsertError)
-            // Try individual inserts for this batch
-            for (const lead of batch) {
+            console.log("[v0] Upsert error:", upsertError)
+
+            for (const lead of validLeads) {
               try {
                 const { error: individualError } = await supabase.from("leads").upsert([lead], {
-                  onConflict: "email,user_id",
+                  onConflict: "email",
                   ignoreDuplicates: false,
                 })
 
@@ -211,17 +206,33 @@ export default function ImportLeadsPage() {
               }
             }
           } else {
-            successCount += batch.length
-            console.log("[v0] Batch successful, processed", batch.length, "leads")
+            successCount += validLeads.length
+            console.log("[v0] Bulk upsert successful, processed", validLeads.length, "leads")
           }
-        } catch (batchError) {
-          console.log("[v0] Batch exception:", batchError)
-          errorCount += batch.length
-          errors.push(`Batch error: ${batchError instanceof Error ? batchError.message : "Unknown error"}`)
+        } catch (bulkError) {
+          console.log("[v0] Bulk upsert exception:", bulkError)
+
+          for (const lead of validLeads) {
+            try {
+              const { error: individualError } = await supabase.from("leads").upsert([lead], {
+                onConflict: "email",
+                ignoreDuplicates: false,
+              })
+
+              if (individualError) {
+                errorCount++
+                errors.push(`${lead.email}: ${individualError.message}`)
+              } else {
+                successCount++
+              }
+            } catch (err) {
+              errorCount++
+              errors.push(`${lead.email}: ${err instanceof Error ? err.message : "Unknown error"}`)
+            }
+          }
         }
       }
 
-      // Handle leads without email addresses separately
       if (invalidLeads.length > 0) {
         try {
           const { error: invalidError } = await supabase.from("leads").insert(invalidLeads)
@@ -255,14 +266,22 @@ export default function ImportLeadsPage() {
 
       if (errorCount > 0 && successCount === 0) {
         throw new Error(
-          `Failed to import leads. Errors: ${errors.slice(0, 3).join("; ")}${errors.length > 3 ? "..." : ""}`,
+          `Failed to import leads. Common issues: duplicate emails, missing required fields. First few errors: ${errors.slice(0, 3).join("; ")}${errors.length > 3 ? "..." : ""}`,
         )
       } else if (errorCount > 0) {
         setError(`Some leads failed to import: ${errors.slice(0, 2).join("; ")}${errors.length > 2 ? "..." : ""}`)
       }
     } catch (error: unknown) {
       console.log("[v0] Import error:", error)
-      setError(error instanceof Error ? error.message : "An error occurred during import")
+      const errorMessage = error instanceof Error ? error.message : "An error occurred during import"
+
+      if (errorMessage.includes("constraint") || errorMessage.includes("unique")) {
+        setError("Some leads have duplicate email addresses. Please check your CSV file and try again.")
+      } else if (errorMessage.includes("permission") || errorMessage.includes("policy")) {
+        setError("Permission denied. Please check your account permissions.")
+      } else {
+        setError(errorMessage)
+      }
     } finally {
       setIsLoading(false)
     }
