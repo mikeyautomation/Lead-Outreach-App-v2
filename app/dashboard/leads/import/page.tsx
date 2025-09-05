@@ -159,16 +159,110 @@ export default function ImportLeadsPage() {
         }
       })
 
-      const { error: insertError } = await supabase.from("leads").insert(leads)
+      console.log("[v0] Attempting to import", leads.length, "leads")
 
-      if (insertError) throw insertError
+      // Filter out leads without email addresses to avoid conflicts
+      const validLeads = leads.filter((lead) => lead.email && lead.email.trim() !== "")
+      const invalidLeads = leads.filter((lead) => !lead.email || lead.email.trim() === "")
 
-      setSuccess(`Successfully imported ${leads.length} leads`)
-      setTimeout(() => {
-        router.push("/dashboard/leads")
-      }, 2000)
+      console.log("[v0] Valid leads with email:", validLeads.length)
+      console.log("[v0] Invalid leads without email:", invalidLeads.length)
+
+      let successCount = 0
+      let errorCount = 0
+      const errors: string[] = []
+
+      // Process leads in smaller batches to avoid conflicts
+      const batchSize = 10
+      for (let i = 0; i < validLeads.length; i += batchSize) {
+        const batch = validLeads.slice(i, i + batchSize)
+
+        try {
+          // Use upsert with email as the conflict resolution key
+          const { error: upsertError, count } = await supabase
+            .from("leads")
+            .upsert(batch, {
+              onConflict: "email,user_id",
+              ignoreDuplicates: false,
+            })
+            .select("id", { count: "exact" })
+
+          if (upsertError) {
+            console.log("[v0] Batch upsert error:", upsertError)
+            // Try individual inserts for this batch
+            for (const lead of batch) {
+              try {
+                const { error: individualError } = await supabase.from("leads").upsert([lead], {
+                  onConflict: "email,user_id",
+                  ignoreDuplicates: false,
+                })
+
+                if (individualError) {
+                  console.log("[v0] Individual lead error:", individualError, "for lead:", lead.email)
+                  errorCount++
+                  errors.push(`${lead.email}: ${individualError.message}`)
+                } else {
+                  successCount++
+                }
+              } catch (err) {
+                console.log("[v0] Individual lead exception:", err)
+                errorCount++
+                errors.push(`${lead.email}: ${err instanceof Error ? err.message : "Unknown error"}`)
+              }
+            }
+          } else {
+            successCount += batch.length
+            console.log("[v0] Batch successful, processed", batch.length, "leads")
+          }
+        } catch (batchError) {
+          console.log("[v0] Batch exception:", batchError)
+          errorCount += batch.length
+          errors.push(`Batch error: ${batchError instanceof Error ? batchError.message : "Unknown error"}`)
+        }
+      }
+
+      // Handle leads without email addresses separately
+      if (invalidLeads.length > 0) {
+        try {
+          const { error: invalidError } = await supabase.from("leads").insert(invalidLeads)
+          if (invalidError) {
+            console.log("[v0] Invalid leads error:", invalidError)
+            errors.push(`${invalidLeads.length} leads without email: ${invalidError.message}`)
+            errorCount += invalidLeads.length
+          } else {
+            successCount += invalidLeads.length
+          }
+        } catch (err) {
+          console.log("[v0] Invalid leads exception:", err)
+          errorCount += invalidLeads.length
+          errors.push(`Leads without email: ${err instanceof Error ? err.message : "Unknown error"}`)
+        }
+      }
+
+      if (successCount > 0) {
+        let message = `Successfully imported ${successCount} leads`
+        if (errorCount > 0) {
+          message += ` (${errorCount} failed)`
+        }
+        setSuccess(message)
+
+        if (errorCount === 0) {
+          setTimeout(() => {
+            router.push("/dashboard/leads")
+          }, 2000)
+        }
+      }
+
+      if (errorCount > 0 && successCount === 0) {
+        throw new Error(
+          `Failed to import leads. Errors: ${errors.slice(0, 3).join("; ")}${errors.length > 3 ? "..." : ""}`,
+        )
+      } else if (errorCount > 0) {
+        setError(`Some leads failed to import: ${errors.slice(0, 2).join("; ")}${errors.length > 2 ? "..." : ""}`)
+      }
     } catch (error: unknown) {
-      setError(error instanceof Error ? error.message : "An error occurred")
+      console.log("[v0] Import error:", error)
+      setError(error instanceof Error ? error.message : "An error occurred during import")
     } finally {
       setIsLoading(false)
     }
