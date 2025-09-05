@@ -34,25 +34,42 @@ interface SmartLeadCampaign {
 
 class SmartLeadService {
   private static baseUrl = "https://server.smartlead.ai/api/v1"
-  private static apiKey = process.env.SMARTLEAD_API_KEY
 
   private static async makeRequest(endpoint: string, options: RequestInit = {}) {
-    const url = `${this.baseUrl}${endpoint}${endpoint.includes("?") ? "&" : "?"}api_key=${this.apiKey}`
+    const apiKey = process.env.SMARTLEAD_API_KEY
 
-    const response = await fetch(url, {
-      ...options,
-      headers: {
-        "Content-Type": "application/json",
-        ...options.headers,
-      },
-    })
-
-    if (!response.ok) {
-      const error = await response.text()
-      throw new Error(`SmartLead API Error: ${response.status} - ${error}`)
+    if (!apiKey) {
+      throw new Error("SMARTLEAD_API_KEY environment variable is not set")
     }
 
-    return response.json()
+    const url = `${this.baseUrl}${endpoint}${endpoint.includes("?") ? "&" : "?"}api_key=${apiKey}`
+
+    console.log("[v0] Making SmartLead API request to:", endpoint)
+
+    try {
+      const response = await fetch(url, {
+        ...options,
+        headers: {
+          "Content-Type": "application/json",
+          ...options.headers,
+        },
+      })
+
+      console.log("[v0] SmartLead API response status:", response.status)
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error("[v0] SmartLead API error response:", errorText)
+        throw new Error(`SmartLead API Error: ${response.status} - ${errorText}`)
+      }
+
+      const result = await response.json()
+      console.log("[v0] SmartLead API success response:", result)
+      return result
+    } catch (error) {
+      console.error("[v0] SmartLead API request failed:", error)
+      throw error
+    }
   }
 
   static async createCampaign(campaignData: {
