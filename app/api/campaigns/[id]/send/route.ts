@@ -84,23 +84,36 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ error: "No leads with valid email addresses" }, { status: 400 })
     }
 
+    if (!process.env.SMARTLEAD_API_KEY) {
+      console.error("[v0] SMARTLEAD_API_KEY environment variable is not set")
+      return NextResponse.json({ error: "SmartLead API key not configured" }, { status: 500 })
+    }
+
     console.log(`[v0] Creating SmartLead campaign for ${validLeads.length} leads`)
 
-    const smartLeadCampaign = await createCampaign({
-      name: `${campaign.name} - ${new Date().toISOString()}`,
-      subject: campaign.subject,
-      email_content: campaign.email_content,
-    })
-
-    // Store SmartLead campaign ID in our database
-    await supabase
-      .from("campaigns")
-      .update({
-        external_id: smartLeadCampaign.id,
-        status: "active",
-        updated_at: new Date().toISOString(),
+    let smartLeadCampaign
+    try {
+      console.log("[v0] Calling SmartLead createCampaign API...")
+      smartLeadCampaign = await createCampaign({
+        name: `${campaign.name} - ${new Date().toISOString()}`,
+        subject: campaign.subject,
+        email_content: campaign.email_content,
       })
-      .eq("id", campaignId)
+      console.log("[v0] SmartLead campaign created successfully:", smartLeadCampaign.id)
+    } catch (smartLeadError) {
+      console.error("[v0] SmartLead createCampaign failed:", smartLeadError)
+      console.error("[v0] SmartLead error details:", {
+        message: smartLeadError instanceof Error ? smartLeadError.message : "Unknown error",
+        stack: smartLeadError instanceof Error ? smartLeadError.stack : "No stack trace",
+      })
+      return NextResponse.json(
+        {
+          error: "Failed to create SmartLead campaign",
+          details: smartLeadError instanceof Error ? smartLeadError.message : "Unknown SmartLead error",
+        },
+        { status: 500 },
+      )
+    }
 
     const smartLeadLeads = validLeads.map((campaignLead: any) => {
       const lead = campaignLead.leads
@@ -119,9 +132,51 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       }
     })
 
-    await addLeadsToSmartLeadCampaign(smartLeadCampaign.id, smartLeadLeads)
+    try {
+      console.log("[v0] Updating campaign status in database...")
+      await supabase
+        .from("campaigns")
+        .update({
+          external_id: smartLeadCampaign.id,
+          status: "active",
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", campaignId)
+      console.log("[v0] Campaign status updated successfully")
+    } catch (dbError) {
+      console.error("[v0] Database update failed:", dbError)
+      return NextResponse.json({ error: "Failed to update campaign status" }, { status: 500 })
+    }
 
-    await startSmartLeadCampaign(smartLeadCampaign.id)
+    try {
+      console.log("[v0] Adding leads to SmartLead campaign...")
+      await addLeadsToSmartLeadCampaign(smartLeadCampaign.id, smartLeadLeads)
+      console.log("[v0] Leads added to SmartLead campaign successfully")
+    } catch (addLeadsError) {
+      console.error("[v0] Failed to add leads to SmartLead:", addLeadsError)
+      return NextResponse.json(
+        {
+          error: "Failed to add leads to SmartLead campaign",
+          details: addLeadsError instanceof Error ? addLeadsError.message : "Unknown error",
+        },
+        { status: 500 },
+      )
+    }
+
+    try {
+      console.log("[v0] Starting SmartLead campaign...")
+      await startSmartLeadCampaign(smartLeadCampaign.id)
+      console.log("[v0] SmartLead campaign started successfully")
+    } catch (startError) {
+      console.error("[v0] Failed to start SmartLead campaign:", startError)
+      return NextResponse.json(
+        {
+          error: "Failed to start SmartLead campaign",
+          details: startError instanceof Error ? startError.message : "Unknown error",
+        },
+        { status: 500 },
+      )
+    }
 
     for (const campaignLead of validLeads) {
       const lead = campaignLead.leads
@@ -168,6 +223,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     })
   } catch (error) {
     console.error("[v0] Error starting SmartLead campaign:", error)
+    console.error("[v0] Full error details:", {
+      message: error instanceof Error ? error.message : "Unknown error",
+      stack: error instanceof Error ? error.stack : "No stack trace",
+      name: error instanceof Error ? error.name : "Unknown error type",
+    })
     return NextResponse.json(
       {
         error: "Internal server error",
