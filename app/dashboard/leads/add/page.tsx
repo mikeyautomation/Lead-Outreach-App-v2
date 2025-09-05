@@ -11,13 +11,16 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { ArrowLeft, Save } from "lucide-react"
+import { ArrowLeft, Save, AlertCircle, Eye } from "lucide-react"
 import Link from "next/link"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 
 export default function AddLeadPage() {
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [duplicateLead, setDuplicateLead] = useState<any>(null)
+  const [showDuplicateOptions, setShowDuplicateOptions] = useState(false)
 
   const [formData, setFormData] = useState({
     first_name: "",
@@ -36,12 +39,57 @@ export default function AddLeadPage() {
     status: "new",
   })
 
-  const handleInputChange = (field: string, value: string) => {
-    setFormData((prev) => ({ ...prev, [field]: value }))
+  const validateForm = () => {
+    if (!formData.first_name.trim()) {
+      setError("First name is required")
+      return false
+    }
+    if (!formData.last_name.trim()) {
+      setError("Last name is required")
+      return false
+    }
+    if (!formData.email.trim()) {
+      setError("Email is required")
+      return false
+    }
+    if (!formData.company_name.trim()) {
+      setError("Company name is required")
+      return false
+    }
+
+    // Email format validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(formData.email)) {
+      setError("Please enter a valid email address")
+      return false
+    }
+
+    return true
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const checkForDuplicateEmail = async (email: string) => {
+    const supabase = createClient()
+    const { data, error } = await supabase.from("leads").select("*").eq("email", email.toLowerCase()).single()
+
+    if (error && error.code !== "PGRST116") {
+      // PGRST116 = no rows found
+      throw error
+    }
+
+    return data
+  }
+
+  const handleInputChange = (field: string, value: string) => {
+    setFormData((prev) => ({ ...prev, [field]: value }))
+    // Clear errors when user starts typing
+    if (error) setError(null)
+    if (showDuplicateOptions) {
+      setShowDuplicateOptions(false)
+      setDuplicateLead(null)
+    }
+  }
+
+  const handleUpdateExisting = async () => {
     setIsLoading(true)
     setError(null)
 
@@ -56,6 +104,64 @@ export default function AddLeadPage() {
         throw new Error("Not authenticated")
       }
 
+      const { error: updateError } = await supabase
+        .from("leads")
+        .update({
+          ...formData,
+          user_id: user.id,
+          contact_name: `${formData.first_name} ${formData.last_name}`.trim(),
+          company: formData.company_name,
+          position: formData.title,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", duplicateLead.id)
+
+      if (updateError) throw updateError
+
+      router.push("/dashboard/leads")
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        setError(error.message)
+      } else {
+        setError("An error occurred while updating the lead")
+      }
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    if (!validateForm()) {
+      return
+    }
+
+    setIsLoading(true)
+    setError(null)
+    setShowDuplicateOptions(false)
+    setDuplicateLead(null)
+
+    const supabase = createClient()
+
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+
+      if (!user) {
+        throw new Error("Not authenticated")
+      }
+
+      const existingLead = await checkForDuplicateEmail(formData.email)
+
+      if (existingLead) {
+        setDuplicateLead(existingLead)
+        setShowDuplicateOptions(true)
+        setError("A lead with this email already exists")
+        return
+      }
+
       const { error: insertError } = await supabase.from("leads").insert({
         ...formData,
         user_id: user.id,
@@ -64,11 +170,26 @@ export default function AddLeadPage() {
         position: formData.title,
       })
 
-      if (insertError) throw insertError
+      if (insertError) {
+        if (insertError.code === "23505") {
+          // Unique constraint violation
+          setError("A lead with this email already exists")
+        } else if (insertError.code === "23502") {
+          // Not null violation
+          setError("Please fill in all required fields")
+        } else {
+          setError(insertError.message || "An error occurred while saving the lead")
+        }
+        return
+      }
 
       router.push("/dashboard/leads")
     } catch (error: unknown) {
-      setError(error instanceof Error ? error.message : "An error occurred")
+      if (error instanceof Error) {
+        setError(error.message)
+      } else {
+        setError("An error occurred while saving the lead")
+      }
     } finally {
       setIsLoading(false)
     }
@@ -268,7 +389,49 @@ export default function AddLeadPage() {
               </div>
 
               {error && (
-                <div className="p-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-md">{error}</div>
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
+
+              {showDuplicateOptions && duplicateLead && (
+                <Alert>
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>
+                    <div className="space-y-3">
+                      <p>A lead with email "{formData.email}" already exists:</p>
+                      <div className="bg-muted p-3 rounded text-sm">
+                        <p>
+                          <strong>Name:</strong> {duplicateLead.contact_name || "Unknown"}
+                        </p>
+                        <p>
+                          <strong>Company:</strong> {duplicateLead.company_name || "Unknown"}
+                        </p>
+                        <p>
+                          <strong>Status:</strong> {duplicateLead.status || "Unknown"}
+                        </p>
+                      </div>
+                      <div className="flex gap-2 pt-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={handleUpdateExisting}
+                          disabled={isLoading}
+                        >
+                          Update Existing Lead
+                        </Button>
+                        <Button type="button" variant="outline" size="sm" asChild>
+                          <Link href={`/dashboard/leads/${duplicateLead.id}`}>
+                            <Eye className="h-4 w-4 mr-1" />
+                            View Existing Lead
+                          </Link>
+                        </Button>
+                      </div>
+                    </div>
+                  </AlertDescription>
+                </Alert>
               )}
 
               <div className="flex gap-4">
