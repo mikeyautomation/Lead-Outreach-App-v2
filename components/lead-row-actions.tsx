@@ -1,9 +1,8 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { MoreHorizontal } from "lucide-react"
 import Link from "next/link"
 import { toast } from "sonner"
@@ -14,11 +13,26 @@ interface LeadRowActionsProps {
 
 export function LeadRowActions({ leadId }: LeadRowActionsProps) {
   const [isDeleting, setIsDeleting] = useState(false)
+  const [isOpen, setIsOpen] = useState(false)
   const router = useRouter()
+  const dropdownRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     console.log("[v0] LeadRowActions component mounted for leadId:", leadId)
   }, [leadId])
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false)
+      }
+    }
+
+    document.addEventListener("mousedown", handleClickOutside)
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside)
+    }
+  }, [])
 
   const handleDelete = async () => {
     console.log("[v0] Delete button clicked for leadId:", leadId)
@@ -27,6 +41,7 @@ export function LeadRowActions({ leadId }: LeadRowActionsProps) {
     }
 
     setIsDeleting(true)
+    setIsOpen(false) // Close dropdown when deleting
     try {
       console.log("[v0] Making DELETE request to:", `/api/leads/${leadId}`)
       const response = await fetch(`/api/leads/${leadId}`, {
@@ -57,32 +72,45 @@ export function LeadRowActions({ leadId }: LeadRowActionsProps) {
   }
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" className="h-8 w-8 p-0 hover:bg-muted cursor-pointer" disabled={isDeleting}>
-          <span className="sr-only">Open menu</span>
-          <MoreHorizontal className="h-4 w-4" />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-[160px]">
-        <DropdownMenuItem asChild>
-          <Link href={`/dashboard/leads/${leadId}/edit`} className="cursor-pointer">
+    <div className="relative" ref={dropdownRef}>
+      <Button
+        variant="ghost"
+        className="h-8 w-8 p-0 hover:bg-muted cursor-pointer"
+        disabled={isDeleting}
+        onClick={() => {
+          console.log("[v0] Three dots button clicked, current isOpen:", isOpen)
+          setIsOpen(!isOpen)
+        }}
+      >
+        <span className="sr-only">Open menu</span>
+        <MoreHorizontal className="h-4 w-4" />
+      </Button>
+
+      {isOpen && (
+        <div className="absolute right-0 top-8 z-50 min-w-[160px] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md animate-in fade-in-0 zoom-in-95">
+          <Link
+            href={`/dashboard/leads/${leadId}/edit`}
+            className="relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground"
+            onClick={() => setIsOpen(false)}
+          >
             Edit
           </Link>
-        </DropdownMenuItem>
-        <DropdownMenuItem asChild>
-          <Link href={`/dashboard/leads/${leadId}`} className="cursor-pointer">
+          <Link
+            href={`/dashboard/leads/${leadId}`}
+            className="relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground"
+            onClick={() => setIsOpen(false)}
+          >
             View Details
           </Link>
-        </DropdownMenuItem>
-        <DropdownMenuItem
-          className="text-red-600 cursor-pointer focus:text-red-600"
-          onClick={handleDelete}
-          disabled={isDeleting}
-        >
-          {isDeleting ? "Deleting..." : "Delete"}
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+          <button
+            className="relative flex w-full cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground text-red-600 focus:text-red-600"
+            onClick={handleDelete}
+            disabled={isDeleting}
+          >
+            {isDeleting ? "Deleting..." : "Delete"}
+          </button>
+        </div>
+      )}
+    </div>
   )
 }
