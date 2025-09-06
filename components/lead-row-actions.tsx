@@ -29,19 +29,30 @@ export function LeadRowActions({ leadId }: LeadRowActionsProps) {
 
     setIsDeleting(true)
     try {
+      console.log("[v0] Making DELETE request to:", `/api/leads/${leadId}`)
       const response = await fetch(`/api/leads/${leadId}`, {
         method: "DELETE",
       })
 
+      console.log("[v0] Response status:", response.status)
+      console.log("[v0] Response ok:", response.ok)
+
       if (!response.ok) {
-        throw new Error("Failed to delete lead")
+        const errorData = await response.json().catch(() => ({ error: "Unknown error" }))
+        console.log("[v0] Error response data:", errorData)
+        throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`)
       }
 
-      toast.success("Lead deleted successfully")
+      const responseData = await response.json()
+      console.log("[v0] Success response data:", responseData)
+
+      toast.success(responseData.message || "Lead deleted successfully")
+      setIsOpen(false) // Close dropdown after successful deletion
       router.refresh()
     } catch (error) {
-      console.error("Error deleting lead:", error)
-      toast.error("Failed to delete lead. Please try again.")
+      console.error("[v0] Error deleting lead:", error)
+      const errorMessage = error instanceof Error ? error.message : "Failed to delete lead"
+      toast.error(`Failed to delete lead: ${errorMessage}`)
     } finally {
       setIsDeleting(false)
     }
