@@ -42,7 +42,7 @@ class SmartLeadService {
       throw new Error("SMARTLEAD_API_KEY environment variable is not set")
     }
 
-    const url = `${this.baseUrl}${endpoint}${endpoint.includes("?") ? "&" : "?"}api_key=${apiKey}`
+    const url = `${SmartLeadService.baseUrl}${endpoint}${endpoint.includes("?") ? "&" : "?"}api_key=${apiKey}`
 
     console.log("[v0] Making SmartLead API request to:", endpoint)
 
@@ -199,5 +199,8 @@ class SmartLeadService {
 }
 
 export { SmartLeadService }
-export const { createCampaign, addLeadsToSmartLeadCampaign, startSmartLeadCampaign, replyToLead, personalizeContent } =
-  SmartLeadService
+export const createCampaign = SmartLeadService.createCampaign.bind(SmartLeadService)
+export const addLeadsToSmartLeadCampaign = SmartLeadService.addLeadsToSmartLeadCampaign.bind(SmartLeadService)
+export const startSmartLeadCampaign = SmartLeadService.startSmartLeadCampaign.bind(SmartLeadService)
+export const replyToLead = SmartLeadService.replyToLead.bind(SmartLeadService)
+export const personalizeContent = SmartLeadService.personalizeContent.bind(SmartLeadService)
