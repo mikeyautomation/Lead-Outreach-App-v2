@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState } from "react"
+import { useState, useRef, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { MoreHorizontal, Play, Pause, Edit, Eye, Trash2 } from "lucide-react"
@@ -20,10 +20,34 @@ interface CampaignRowActionsProps {
 export function CampaignRowActions({ campaign }: CampaignRowActionsProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0 })
+  const buttonRef = useRef<HTMLButtonElement>(null)
   const router = useRouter()
   const supabase = createBrowserClient()
 
   console.log("[v0] CampaignRowActions component mounted for campaignId:", campaign.id)
+
+  useEffect(() => {
+    if (isOpen && buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect()
+      const dropdownWidth = 160
+      const dropdownHeight = 200 // Approximate height
+
+      let top = rect.bottom + 4
+      let left = rect.right - dropdownWidth
+
+      // Ensure dropdown stays within viewport bounds
+      if (left < 8) left = 8
+      if (left + dropdownWidth > window.innerWidth - 8) {
+        left = window.innerWidth - dropdownWidth - 8
+      }
+      if (top + dropdownHeight > window.innerHeight - 8) {
+        top = rect.top - dropdownHeight - 4
+      }
+
+      setDropdownPosition({ top, left })
+    }
+  }, [isOpen])
 
   const handleButtonClick = () => {
     console.log("[v0] Three dots button clicked, current isOpen:", isOpen)
@@ -108,6 +132,7 @@ export function CampaignRowActions({ campaign }: CampaignRowActionsProps) {
   return (
     <div className="relative">
       <Button
+        ref={buttonRef}
         variant="ghost"
         size="sm"
         onClick={handleButtonClick}
@@ -121,7 +146,13 @@ export function CampaignRowActions({ campaign }: CampaignRowActionsProps) {
       {isOpen && (
         <>
           <div className="fixed inset-0 z-[9998]" onClick={handleOutsideClick} />
-          <div className="absolute right-0 -top-2 z-[9999] min-w-[160px] rounded-md border bg-white p-1 shadow-2xl ring-1 ring-black/5">
+          <div
+            className="fixed z-[9999] min-w-[160px] rounded-md border bg-white p-1 shadow-2xl ring-1 ring-black/5"
+            style={{
+              top: `${dropdownPosition.top}px`,
+              left: `${dropdownPosition.left}px`,
+            }}
+          >
             <button
               onClick={() => {
                 setIsOpen(false)

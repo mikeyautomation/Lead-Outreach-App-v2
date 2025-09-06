@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { MoreHorizontal } from "lucide-react"
@@ -14,11 +14,35 @@ interface LeadRowActionsProps {
 export function LeadRowActions({ leadId }: LeadRowActionsProps) {
   const [isDeleting, setIsDeleting] = useState(false)
   const [isOpen, setIsOpen] = useState(false)
+  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0 })
+  const buttonRef = useRef<HTMLButtonElement>(null)
   const router = useRouter()
 
   useEffect(() => {
     console.log("[v0] LeadRowActions component mounted for leadId:", leadId)
   }, [leadId])
+
+  useEffect(() => {
+    if (isOpen && buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect()
+      const dropdownWidth = 160
+      const dropdownHeight = 150 // Approximate height
+
+      let top = rect.bottom + 4
+      let left = rect.right - dropdownWidth
+
+      // Ensure dropdown stays within viewport bounds
+      if (left < 8) left = 8
+      if (left + dropdownWidth > window.innerWidth - 8) {
+        left = window.innerWidth - dropdownWidth - 8
+      }
+      if (top + dropdownHeight > window.innerHeight - 8) {
+        top = rect.top - dropdownHeight - 4
+      }
+
+      setDropdownPosition({ top, left })
+    }
+  }, [isOpen])
 
   const handleDelete = async () => {
     console.log("[v0] Delete button clicked for leadId:", leadId)
@@ -64,6 +88,7 @@ export function LeadRowActions({ leadId }: LeadRowActionsProps) {
   return (
     <div className="relative">
       <Button
+        ref={buttonRef}
         variant="ghost"
         className="h-8 w-8 p-0 hover:bg-muted cursor-pointer"
         disabled={isDeleting}
@@ -79,7 +104,13 @@ export function LeadRowActions({ leadId }: LeadRowActionsProps) {
       {isOpen && (
         <>
           <div className="fixed inset-0 z-[9998]" onClick={handleBackdropClick} />
-          <div className="absolute right-0 -top-2 z-[9999] min-w-[160px] rounded-md border bg-white p-1 shadow-2xl ring-1 ring-black/5">
+          <div
+            className="fixed z-[9999] min-w-[160px] rounded-md border bg-white p-1 shadow-2xl ring-1 ring-black/5"
+            style={{
+              top: `${dropdownPosition.top}px`,
+              left: `${dropdownPosition.left}px`,
+            }}
+          >
             <Link
               href={`/dashboard/leads/${leadId}/edit`}
               className="flex cursor-pointer items-center rounded-sm px-3 py-2 text-sm hover:bg-gray-100"
