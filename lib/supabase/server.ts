@@ -1,5 +1,6 @@
 import { createServerClient as createSupabaseServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
+import type { NextRequest } from "next/server"
 
 /**
  * Especially important if using Fluid compute: Don't put this client in a
@@ -43,6 +44,20 @@ export function createServerClient() {
           // This can be ignored if you have middleware refreshing
           // user sessions.
         }
+      },
+    },
+  })
+}
+
+export function createServerClientWithRequest(request: NextRequest) {
+  return createSupabaseServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
+    cookies: {
+      getAll() {
+        return request.cookies.getAll()
+      },
+      setAll(cookiesToSet) {
+        // For API routes, we don't need to set cookies
+        // The client will handle authentication via existing cookies
       },
     },
   })

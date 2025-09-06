@@ -1,11 +1,11 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createServerClient } from "@/lib/supabase/server"
+import { createServerClientWithRequest } from "@/lib/supabase/server"
 
 export async function POST(request: NextRequest) {
   try {
     console.log("[v0] Starting CSV import API")
 
-    const supabase = createServerClient()
+    const supabase = createServerClientWithRequest(request)
 
     // Get the authenticated user
     const {
