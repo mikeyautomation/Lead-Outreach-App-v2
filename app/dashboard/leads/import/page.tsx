@@ -4,7 +4,6 @@ import type React from "react"
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -132,15 +131,6 @@ export default function ImportLeadsPage() {
     setSuccess(null)
 
     try {
-      const supabase = createClient()
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-
-      if (!user) {
-        throw new Error("Not authenticated")
-      }
-
       const text = await file.text()
       const { data: csvData } = parseCSV(text)
 
@@ -152,7 +142,6 @@ export default function ImportLeadsPage() {
         const lead = mapCSVToLead(row)
         return {
           ...lead,
-          user_id: user.id,
           contact_name: `${lead.first_name} ${lead.last_name}`.trim() || "Unknown",
           company: lead.company_name || "Unknown",
           position: lead.title,
@@ -161,115 +150,42 @@ export default function ImportLeadsPage() {
 
       console.log("[v0] Attempting to import", leads.length, "leads")
 
-      const validLeads = leads.filter((lead) => lead.email && lead.email.trim() !== "")
-      const invalidLeads = leads.filter((lead) => !lead.email || lead.email.trim() === "")
+      const response = await fetch("/api/leads/import", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ leads }),
+      })
 
-      console.log("[v0] Valid leads with email:", validLeads.length)
-      console.log("[v0] Invalid leads without email:", invalidLeads.length)
+      const result = await response.json()
 
-      let successCount = 0
-      let errorCount = 0
-      const errors: string[] = []
-
-      if (validLeads.length > 0) {
-        try {
-          // Use upsert with proper conflict resolution on email field
-          const { data, error: upsertError } = await supabase
-            .from("leads")
-            .upsert(validLeads, {
-              onConflict: "email",
-              ignoreDuplicates: false,
-            })
-            .select("id")
-
-          if (upsertError) {
-            console.log("[v0] Upsert error:", upsertError)
-
-            for (const lead of validLeads) {
-              try {
-                const { error: individualError } = await supabase.from("leads").upsert([lead], {
-                  onConflict: "email",
-                  ignoreDuplicates: false,
-                })
-
-                if (individualError) {
-                  console.log("[v0] Individual lead error:", individualError, "for lead:", lead.email)
-                  errorCount++
-                  errors.push(`${lead.email}: ${individualError.message}`)
-                } else {
-                  successCount++
-                }
-              } catch (err) {
-                console.log("[v0] Individual lead exception:", err)
-                errorCount++
-                errors.push(`${lead.email}: ${err instanceof Error ? err.message : "Unknown error"}`)
-              }
-            }
-          } else {
-            successCount += validLeads.length
-            console.log("[v0] Bulk upsert successful, processed", validLeads.length, "leads")
-          }
-        } catch (bulkError) {
-          console.log("[v0] Bulk upsert exception:", bulkError)
-
-          for (const lead of validLeads) {
-            try {
-              const { error: individualError } = await supabase.from("leads").upsert([lead], {
-                onConflict: "email",
-                ignoreDuplicates: false,
-              })
-
-              if (individualError) {
-                errorCount++
-                errors.push(`${lead.email}: ${individualError.message}`)
-              } else {
-                successCount++
-              }
-            } catch (err) {
-              errorCount++
-              errors.push(`${lead.email}: ${err instanceof Error ? err.message : "Unknown error"}`)
-            }
-          }
-        }
+      if (!response.ok) {
+        throw new Error(result.error || "Import failed")
       }
 
-      if (invalidLeads.length > 0) {
-        try {
-          const { error: invalidError } = await supabase.from("leads").insert(invalidLeads)
-          if (invalidError) {
-            console.log("[v0] Invalid leads error:", invalidError)
-            errors.push(`${invalidLeads.length} leads without email: ${invalidError.message}`)
-            errorCount += invalidLeads.length
-          } else {
-            successCount += invalidLeads.length
-          }
-        } catch (err) {
-          console.log("[v0] Invalid leads exception:", err)
-          errorCount += invalidLeads.length
-          errors.push(`Leads without email: ${err instanceof Error ? err.message : "Unknown error"}`)
-        }
-      }
-
-      if (successCount > 0) {
-        let message = `Successfully imported ${successCount} leads`
-        if (errorCount > 0) {
-          message += ` (${errorCount} failed)`
+      if (result.successCount > 0) {
+        let message = `Successfully imported ${result.successCount} leads`
+        if (result.errorCount > 0) {
+          message += ` (${result.errorCount} failed)`
         }
         setSuccess(message)
 
-        if (errorCount === 0) {
+        if (result.errorCount === 0) {
           setTimeout(() => {
             router.push("/dashboard/leads")
           }, 2000)
         }
       }
 
-      if (errorCount > 0 && successCount === 0) {
+      if (result.errorCount > 0 && result.successCount === 0) {
         throw new Error(
-          `Failed to import leads. Common issues: duplicate emails, missing required fields. First few errors: ${errors.slice(0, 3).join("; ")}${errors.length > 3 ? "..." : ""}`,
+          `Failed to import leads. First few errors: ${result.errors?.slice(0, 3).join("; ")}${result.errors?.length > 3 ? "..." : ""}`,
         )
-      } else if (errorCount > 0) {
-        setError(`Some leads failed to import: ${errors.slice(0, 2).join("; ")}${errors.length > 2 ? "..." : ""}`)
+      } else if (result.errorCount > 0) {
+        setError(
+          `Some leads failed to import: ${result.errors?.slice(0, 2).join("; ")}${result.errors?.length > 2 ? "..." : ""}`,
+        )
       }
     } catch (error: unknown) {
       console.log("[v0] Import error:", error)
