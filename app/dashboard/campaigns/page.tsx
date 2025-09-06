@@ -4,9 +4,9 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Plus, Play, Pause, MoreHorizontal, Mail, Users } from "lucide-react"
+import { Plus, Play, Pause, Mail, Users } from "lucide-react"
 import Link from "next/link"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { CampaignRowActions } from "@/components/campaign-row-actions"
 
 export default async function CampaignsPage() {
   const supabase = createServerClient()
@@ -149,25 +149,7 @@ export default async function CampaignsPage() {
                             </div>
                           </TableCell>
                           <TableCell>
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="sm">
-                                  <MoreHorizontal className="h-4 w-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuItem asChild>
-                                  <Link href={`/dashboard/campaigns/${campaign.id}`}>View Details</Link>
-                                </DropdownMenuItem>
-                                <DropdownMenuItem asChild>
-                                  <Link href={`/dashboard/campaigns/${campaign.id}/edit`}>Edit</Link>
-                                </DropdownMenuItem>
-                                {campaign.status === "draft" && <DropdownMenuItem>Start Campaign</DropdownMenuItem>}
-                                {campaign.status === "active" && <DropdownMenuItem>Pause Campaign</DropdownMenuItem>}
-                                {campaign.status === "paused" && <DropdownMenuItem>Resume Campaign</DropdownMenuItem>}
-                                <DropdownMenuItem className="text-red-600">Delete</DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
+                            <CampaignRowActions campaign={campaign} />
                           </TableCell>
                         </TableRow>
                       )
