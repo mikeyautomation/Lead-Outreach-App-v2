@@ -14,8 +14,10 @@ interface LeadRowActionsProps {
 export function LeadRowActions({ leadId }: LeadRowActionsProps) {
   const [isDeleting, setIsDeleting] = useState(false)
   const [isOpen, setIsOpen] = useState(false)
+  const [dropdownPosition, setDropdownPosition] = useState<"bottom" | "top">("bottom")
   const router = useRouter()
   const dropdownRef = useRef<HTMLDivElement>(null)
+  const buttonRef = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
     console.log("[v0] LeadRowActions component mounted for leadId:", leadId)
@@ -28,11 +30,30 @@ export function LeadRowActions({ leadId }: LeadRowActionsProps) {
       }
     }
 
-    document.addEventListener("mousedown", handleClickOutside)
+    if (isOpen) {
+      document.addEventListener("mousedown", handleClickOutside)
+    }
+
     return () => {
       document.removeEventListener("mousedown", handleClickOutside)
     }
-  }, [])
+  }, [isOpen])
+
+  const calculateDropdownPosition = () => {
+    if (!buttonRef.current) return
+
+    const buttonRect = buttonRef.current.getBoundingClientRect()
+    const viewportHeight = window.innerHeight
+    const dropdownHeight = 120 // Approximate dropdown height
+    const spaceBelow = viewportHeight - buttonRect.bottom
+    const spaceAbove = buttonRect.top
+
+    if (spaceBelow < dropdownHeight && spaceAbove > dropdownHeight) {
+      setDropdownPosition("top")
+    } else {
+      setDropdownPosition("bottom")
+    }
+  }
 
   const handleDelete = async () => {
     console.log("[v0] Delete button clicked for leadId:", leadId)
@@ -71,14 +92,22 @@ export function LeadRowActions({ leadId }: LeadRowActionsProps) {
     }
   }
 
+  const handleBackdropClick = () => {
+    setIsOpen(false)
+  }
+
   return (
     <div className="relative" ref={dropdownRef}>
       <Button
+        ref={buttonRef}
         variant="ghost"
         className="h-8 w-8 p-0 hover:bg-muted cursor-pointer"
         disabled={isDeleting}
         onClick={() => {
           console.log("[v0] Three dots button clicked, current isOpen:", isOpen)
+          if (!isOpen) {
+            calculateDropdownPosition()
+          }
           setIsOpen(!isOpen)
         }}
       >
@@ -87,29 +116,36 @@ export function LeadRowActions({ leadId }: LeadRowActionsProps) {
       </Button>
 
       {isOpen && (
-        <div className="absolute right-0 top-8 z-50 min-w-[160px] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md animate-in fade-in-0 zoom-in-95">
-          <Link
-            href={`/dashboard/leads/${leadId}/edit`}
-            className="relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground"
-            onClick={() => setIsOpen(false)}
+        <>
+          <div className="fixed inset-0 z-40" onClick={handleBackdropClick} />
+          <div
+            className={`absolute right-0 z-50 min-w-[160px] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-lg animate-in fade-in-0 zoom-in-95 ${
+              dropdownPosition === "top" ? "bottom-8" : "top-8"
+            }`}
           >
-            Edit
-          </Link>
-          <Link
-            href={`/dashboard/leads/${leadId}`}
-            className="relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground"
-            onClick={() => setIsOpen(false)}
-          >
-            View Details
-          </Link>
-          <button
-            className="relative flex w-full cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground text-red-600 focus:text-red-600"
-            onClick={handleDelete}
-            disabled={isDeleting}
-          >
-            {isDeleting ? "Deleting..." : "Delete"}
-          </button>
-        </div>
+            <Link
+              href={`/dashboard/leads/${leadId}/edit`}
+              className="relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground"
+              onClick={() => setIsOpen(false)}
+            >
+              Edit
+            </Link>
+            <Link
+              href={`/dashboard/leads/${leadId}`}
+              className="relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground"
+              onClick={() => setIsOpen(false)}
+            >
+              View Details
+            </Link>
+            <button
+              className="relative flex w-full cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground text-red-600 focus:text-red-600"
+              onClick={handleDelete}
+              disabled={isDeleting}
+            >
+              {isDeleting ? "Deleting..." : "Delete"}
+            </button>
+          </div>
+        </>
       )}
     </div>
   )
