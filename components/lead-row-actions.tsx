@@ -119,7 +119,7 @@ export function LeadRowActions({ leadId }: LeadRowActionsProps) {
         <>
           <div className="fixed inset-0 z-40" onClick={handleBackdropClick} />
           <div
-            className={`absolute right-0 z-50 min-w-[160px] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-lg animate-in fade-in-0 zoom-in-95 ${
+            className={`absolute right-0 z-[9999] min-w-[160px] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-xl animate-in fade-in-0 zoom-in-95 ${
               dropdownPosition === "top" ? "bottom-8" : "top-8"
             }`}
           >

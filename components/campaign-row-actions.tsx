@@ -145,7 +145,7 @@ export function CampaignRowActions({ campaign }: CampaignRowActionsProps) {
         <>
           <div className="fixed inset-0 z-40" onClick={handleOutsideClick} />
           <div
-            className={`absolute right-0 z-50 min-w-[160px] rounded-md border bg-popover p-1 text-popover-foreground shadow-lg ${
+            className={`absolute right-0 z-[9999] min-w-[160px] rounded-md border bg-popover p-1 text-popover-foreground shadow-xl ${
               dropdownPosition === "top" ? "bottom-8" : "top-8"
             }`}
           >
