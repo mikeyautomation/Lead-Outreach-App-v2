@@ -1,8 +1,7 @@
 "use client"
 
 import type React from "react"
-
-import { useState, useRef } from "react"
+import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { MoreHorizontal, Play, Pause, Edit, Eye, Trash2 } from "lucide-react"
@@ -21,34 +20,13 @@ interface CampaignRowActionsProps {
 export function CampaignRowActions({ campaign }: CampaignRowActionsProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
-  const [dropdownPosition, setDropdownPosition] = useState<"bottom" | "top">("bottom")
   const router = useRouter()
   const supabase = createBrowserClient()
-  const buttonRef = useRef<HTMLButtonElement>(null)
 
   console.log("[v0] CampaignRowActions component mounted for campaignId:", campaign.id)
 
-  const calculateDropdownPosition = () => {
-    if (!buttonRef.current) return
-
-    const buttonRect = buttonRef.current.getBoundingClientRect()
-    const viewportHeight = window.innerHeight
-    const dropdownHeight = 200 // Approximate dropdown height for campaigns (more items)
-    const spaceBelow = viewportHeight - buttonRect.bottom
-    const spaceAbove = buttonRect.top
-
-    if (spaceBelow < dropdownHeight && spaceAbove > dropdownHeight) {
-      setDropdownPosition("top")
-    } else {
-      setDropdownPosition("bottom")
-    }
-  }
-
   const handleButtonClick = () => {
     console.log("[v0] Three dots button clicked, current isOpen:", isOpen)
-    if (!isOpen) {
-      calculateDropdownPosition()
-    }
     setIsOpen(!isOpen)
   }
 
@@ -130,7 +108,6 @@ export function CampaignRowActions({ campaign }: CampaignRowActionsProps) {
   return (
     <div className="relative">
       <Button
-        ref={buttonRef}
         variant="ghost"
         size="sm"
         onClick={handleButtonClick}
@@ -143,18 +120,14 @@ export function CampaignRowActions({ campaign }: CampaignRowActionsProps) {
 
       {isOpen && (
         <>
-          <div className="fixed inset-0 z-40" onClick={handleOutsideClick} />
-          <div
-            className={`absolute right-0 z-[9999] min-w-[160px] rounded-md border bg-popover p-1 text-popover-foreground shadow-xl ${
-              dropdownPosition === "top" ? "bottom-8" : "top-8"
-            }`}
-          >
+          <div className="fixed inset-0 z-[9998]" onClick={handleOutsideClick} />
+          <div className="absolute right-0 -top-2 z-[9999] min-w-[160px] rounded-md border bg-white p-1 shadow-2xl ring-1 ring-black/5">
             <button
               onClick={() => {
                 setIsOpen(false)
                 router.push(`/dashboard/campaigns/${campaign.id}`)
               }}
-              className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent hover:text-accent-foreground cursor-pointer"
+              className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-sm hover:bg-gray-100 cursor-pointer"
             >
               <Eye className="h-4 w-4" />
               View Details
@@ -165,7 +138,7 @@ export function CampaignRowActions({ campaign }: CampaignRowActionsProps) {
                 setIsOpen(false)
                 router.push(`/dashboard/campaigns/${campaign.id}/edit`)
               }}
-              className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent hover:text-accent-foreground cursor-pointer"
+              className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-sm hover:bg-gray-100 cursor-pointer"
             >
               <Edit className="h-4 w-4" />
               Edit
@@ -175,7 +148,7 @@ export function CampaignRowActions({ campaign }: CampaignRowActionsProps) {
               <button
                 onClick={() => handleStatusChange("active")}
                 disabled={isLoading}
-                className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent hover:text-accent-foreground cursor-pointer disabled:opacity-50"
+                className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-sm hover:bg-gray-100 cursor-pointer disabled:opacity-50"
               >
                 <Play className="h-4 w-4" />
                 Start Campaign
@@ -186,7 +159,7 @@ export function CampaignRowActions({ campaign }: CampaignRowActionsProps) {
               <button
                 onClick={() => handleStatusChange("paused")}
                 disabled={isLoading}
-                className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent hover:text-accent-foreground cursor-pointer disabled:opacity-50"
+                className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-sm hover:bg-gray-100 cursor-pointer disabled:opacity-50"
               >
                 <Pause className="h-4 w-4" />
                 Pause Campaign
@@ -197,7 +170,7 @@ export function CampaignRowActions({ campaign }: CampaignRowActionsProps) {
               <button
                 onClick={() => handleStatusChange("active")}
                 disabled={isLoading}
-                className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent hover:text-accent-foreground cursor-pointer disabled:opacity-50"
+                className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-sm hover:bg-gray-100 cursor-pointer disabled:opacity-50"
               >
                 <Play className="h-4 w-4" />
                 Resume Campaign
@@ -207,7 +180,7 @@ export function CampaignRowActions({ campaign }: CampaignRowActionsProps) {
             <button
               onClick={handleDelete}
               disabled={isLoading}
-              className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-red-600 hover:bg-red-50 hover:text-red-700 cursor-pointer disabled:opacity-50"
+              className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-sm text-red-600 hover:bg-red-50 hover:text-red-700 cursor-pointer disabled:opacity-50"
             >
               <Trash2 className="h-4 w-4" />
               Delete

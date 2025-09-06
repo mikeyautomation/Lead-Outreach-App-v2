@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { MoreHorizontal } from "lucide-react"
@@ -14,46 +14,11 @@ interface LeadRowActionsProps {
 export function LeadRowActions({ leadId }: LeadRowActionsProps) {
   const [isDeleting, setIsDeleting] = useState(false)
   const [isOpen, setIsOpen] = useState(false)
-  const [dropdownPosition, setDropdownPosition] = useState<"bottom" | "top">("bottom")
   const router = useRouter()
-  const dropdownRef = useRef<HTMLDivElement>(null)
-  const buttonRef = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
     console.log("[v0] LeadRowActions component mounted for leadId:", leadId)
   }, [leadId])
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsOpen(false)
-      }
-    }
-
-    if (isOpen) {
-      document.addEventListener("mousedown", handleClickOutside)
-    }
-
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside)
-    }
-  }, [isOpen])
-
-  const calculateDropdownPosition = () => {
-    if (!buttonRef.current) return
-
-    const buttonRect = buttonRef.current.getBoundingClientRect()
-    const viewportHeight = window.innerHeight
-    const dropdownHeight = 120 // Approximate dropdown height
-    const spaceBelow = viewportHeight - buttonRect.bottom
-    const spaceAbove = buttonRect.top
-
-    if (spaceBelow < dropdownHeight && spaceAbove > dropdownHeight) {
-      setDropdownPosition("top")
-    } else {
-      setDropdownPosition("bottom")
-    }
-  }
 
   const handleDelete = async () => {
     console.log("[v0] Delete button clicked for leadId:", leadId)
@@ -97,17 +62,13 @@ export function LeadRowActions({ leadId }: LeadRowActionsProps) {
   }
 
   return (
-    <div className="relative" ref={dropdownRef}>
+    <div className="relative">
       <Button
-        ref={buttonRef}
         variant="ghost"
         className="h-8 w-8 p-0 hover:bg-muted cursor-pointer"
         disabled={isDeleting}
         onClick={() => {
           console.log("[v0] Three dots button clicked, current isOpen:", isOpen)
-          if (!isOpen) {
-            calculateDropdownPosition()
-          }
           setIsOpen(!isOpen)
         }}
       >
@@ -117,28 +78,24 @@ export function LeadRowActions({ leadId }: LeadRowActionsProps) {
 
       {isOpen && (
         <>
-          <div className="fixed inset-0 z-40" onClick={handleBackdropClick} />
-          <div
-            className={`absolute right-0 z-[9999] min-w-[160px] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-xl animate-in fade-in-0 zoom-in-95 ${
-              dropdownPosition === "top" ? "bottom-8" : "top-8"
-            }`}
-          >
+          <div className="fixed inset-0 z-[9998]" onClick={handleBackdropClick} />
+          <div className="absolute right-0 -top-2 z-[9999] min-w-[160px] rounded-md border bg-white p-1 shadow-2xl ring-1 ring-black/5">
             <Link
               href={`/dashboard/leads/${leadId}/edit`}
-              className="relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground"
+              className="flex cursor-pointer items-center rounded-sm px-3 py-2 text-sm hover:bg-gray-100"
               onClick={() => setIsOpen(false)}
             >
               Edit
             </Link>
             <Link
               href={`/dashboard/leads/${leadId}`}
-              className="relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground"
+              className="flex cursor-pointer items-center rounded-sm px-3 py-2 text-sm hover:bg-gray-100"
               onClick={() => setIsOpen(false)}
             >
               View Details
             </Link>
             <button
-              className="relative flex w-full cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground text-red-600 focus:text-red-600"
+              className="flex w-full cursor-pointer items-center rounded-sm px-3 py-2 text-sm text-red-600 hover:bg-red-50 hover:text-red-700 disabled:opacity-50"
               onClick={handleDelete}
               disabled={isDeleting}
             >
