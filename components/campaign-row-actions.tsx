@@ -34,17 +34,24 @@ export function CampaignRowActions({ campaign }: CampaignRowActionsProps) {
       const dropdownHeight = 200 // Approximate height
 
       let top = rect.bottom + 4
-      let left = rect.left // Changed from rect.right - dropdownWidth to rect.left
+      let left = rect.right - dropdownWidth // Position dropdown to the right edge of button
 
       // Ensure dropdown stays within viewport bounds
-      if (left + dropdownWidth > window.innerWidth - 8) {
-        left = rect.right - dropdownWidth // If no space on right, align to right edge of button
+      if (left < 8) {
+        left = rect.left // If no space on left, align to left edge of button
       }
-      if (left < 8) left = 8
+      if (left + dropdownWidth > window.innerWidth - 8) {
+        left = window.innerWidth - dropdownWidth - 8 // Keep within right viewport boundary
+      }
       if (top + dropdownHeight > window.innerHeight - 8) {
-        top = rect.top - dropdownHeight - 4
+        top = rect.top - dropdownHeight - 4 // Position above button if no space below
+      }
+      if (top < 8) {
+        top = rect.bottom + 4 // Fallback to below button
       }
 
+      console.log("[v0] Button rect:", rect)
+      console.log("[v0] Calculated dropdown position:", { top, left })
       setDropdownPosition({ top, left })
     }
   }, [isOpen])
