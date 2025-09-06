@@ -29,13 +29,13 @@ export function LeadRowActions({ leadId }: LeadRowActionsProps) {
       const dropdownHeight = 150 // Approximate height
 
       let top = rect.bottom + 4
-      let left = rect.right - dropdownWidth
+      let left = rect.left // Changed from rect.right - dropdownWidth to rect.left
 
       // Ensure dropdown stays within viewport bounds
-      if (left < 8) left = 8
       if (left + dropdownWidth > window.innerWidth - 8) {
-        left = window.innerWidth - dropdownWidth - 8
+        left = rect.right - dropdownWidth // If no space on right, align to right edge of button
       }
+      if (left < 8) left = 8
       if (top + dropdownHeight > window.innerHeight - 8) {
         top = rect.top - dropdownHeight - 4
       }
