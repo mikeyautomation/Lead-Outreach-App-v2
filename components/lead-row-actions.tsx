@@ -14,7 +14,6 @@ interface LeadRowActionsProps {
 
 export function LeadRowActions({ leadId }: LeadRowActionsProps) {
   const [isDeleting, setIsDeleting] = useState(false)
-  const [isOpen, setIsOpen] = useState(false)
   const router = useRouter()
 
   useEffect(() => {
@@ -47,7 +46,6 @@ export function LeadRowActions({ leadId }: LeadRowActionsProps) {
       console.log("[v0] Success response data:", responseData)
 
       toast.success(responseData.message || "Lead deleted successfully")
-      setIsOpen(false) // Close dropdown after successful deletion
       router.refresh()
     } catch (error) {
       console.error("[v0] Error deleting lead:", error)
@@ -58,20 +56,10 @@ export function LeadRowActions({ leadId }: LeadRowActionsProps) {
     }
   }
 
-  const handleButtonClick = () => {
-    console.log("[v0] Three dots button clicked for leadId:", leadId)
-    setIsOpen(!isOpen)
-  }
-
   return (
-    <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
+    <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button
-          variant="ghost"
-          className="h-8 w-8 p-0 hover:bg-muted"
-          disabled={isDeleting}
-          onClick={handleButtonClick}
-        >
+        <Button variant="ghost" className="h-8 w-8 p-0 hover:bg-muted cursor-pointer" disabled={isDeleting}>
           <span className="sr-only">Open menu</span>
           <MoreHorizontal className="h-4 w-4" />
         </Button>
